@@ -1,13 +1,15 @@
 var Terragen = function () {
-    var canvas = document.getElementById('canvas'),
-        context = canvas.getContext('2d');
+    this.canvas = document.getElementById('canvas');
+    this.context = canvas.getContext('2d');
 
-    context.font = '16pt Arial';
-    context.fillStyle = 'cornflowerblue';
-    context.strokeStyle = 'blue';
+    this.drawText('Hello, Canvas', canvas.width * 0.5 - 150, canvas.height * 0.5 + 15, '16pt Arial', 'cornflowerblue');
+};
 
-    context.fillText('Hello, Canvas', canvas.width * 0.5 - 150, canvas.height * 0.5 + 15);
-    //context.strokeText('Hello, Canvas', canvas.width * 0.5 - 150, canvas.height * 0.5 + 15);
+Terragen.prototype.drawText = function(text, x, y, font, fillStyle) {
+    this.context.font = font || '16pt Arial';
+    this.context.fillStyle = fillStyle || 'cornflowerblue';
+
+    this.context.fillText(text, x, y);
 };
 
 function addEvent(target, event, fnc) {
@@ -32,5 +34,5 @@ function addEvent(target, event, fnc) {
 }
 
 addEvent(window, 'load', function () {
-    new terragen();
+    new Terragen();
 });
