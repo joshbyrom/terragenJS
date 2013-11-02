@@ -1,23 +1,31 @@
-var Terragen = function (update, render) {
+var Terragen = function () {
     this.canvas = document.getElementById('canvas');
     this.context = canvas.getContext('2d');
 
+    this.active = true;
+};
+
+Terragen.prototype.start = function(update, render, callback) {
     this.update = update || function() { this.active = false; };
     this.render = render || function() {};
 
     this.update = this.update.bind(this);
     this.render = this.render.bind(this);
 
-    this.active = true;
-};
+    var loop = function() {
+        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);   
 
-Terragen.prototype.start = function() {
-    this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);   
+        this.render();
+        this.update();
 
-    this.update();
-    this.render();
+        if(this.active) {
+            requestAnimationFrame(loop);
+        } else if(callback !== undefined) {
+            this.callback.apply(this);
+        }
+    }.bind(this);
 
-    if(this.active) requestAnimationFrame(this.start.bind(this));
+    requestAnimationFrame(loop);
 }
 
 Terragen.prototype.drawText = function(text, x, y, font, fillStyle) {
@@ -49,7 +57,8 @@ function addEvent(target, event, fnc) {
 }
 
 addEvent(window, 'load', function () {
-    var app = new Terragen(
+    var app = new Terragen();
+    app.start(
         function () {
 
         },
