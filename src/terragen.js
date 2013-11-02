@@ -22,10 +22,12 @@ Terragen.prototype.start = function(update, render, callback) {
             requestAnimationFrame(loop);
         } else if(callback !== undefined) {
             this.callback.apply(this);
+            console.log('simulation ended');
         }
     }.bind(this);
 
-    requestAnimationFrame(loop);
+    console.log('simulation started');
+    requestAnimationFrame(loop.bind(this));
 }
 
 Terragen.prototype.drawText = function(text, x, y, font, fillStyle) {
@@ -42,17 +44,16 @@ function addEvent(target, event, fnc) {
         target.addEventListener(event, fnc, false);
     else if (typeof window.attachEvent != "undefined") {
         target.attachEvent(onEvent, fnc);
-    }
-    else {
+    } else {
         if (target.onEvent !== null) {
             var oldOnload = target.onEvent;
             target.onEvent = function (e) {
                 oldOnload(e);
                 target[fnc]();
             };
-        }
-        else
+        } else {
             target.onEvent = fnc;
+        }
     }
 }
 
@@ -67,6 +68,4 @@ addEvent(window, 'load', function () {
             this.drawText('Hello, Canvas', canvas.width * 0.5, canvas.height * 0.5, '16pt Arial', 'cornflowerblue');
         }
     );
-
-    app.start();
 });
