@@ -55,8 +55,16 @@ Terragen.prototype.createGrid = function(width, height) {
             };
         };
 
+        this.Grid.prototype.mapRegion = function(startX, startY, endX, endY, callback) {
+            for(var i = startX; i < endX; ++i) {
+                for(var j = startY; j < endY; ++j) {
+                    callback(this.get(i, j));
+                }
+            }
+        };
+
         this.Grid.prototype._toIndex = function(column, row) {
-            var index = column * this.width + row;
+            var index = parseInt(column * this.width + row);
             return index;
         };
     };
@@ -89,6 +97,10 @@ Terragen.prototype.start = function(update, render, callback) {
     requestAnimationFrame(loop.bind(this));
 }
 
+Terragen.prototype.range = function(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 Terragen.prototype.drawText = function(text, font, fillStyle, callback) {
     this.context.font = font || '16pt Arial';
     this.context.fillStyle = fillStyle || 'cornflowerblue';
@@ -101,6 +113,18 @@ Terragen.prototype.drawText = function(text, font, fillStyle, callback) {
     callback.apply(callback, [width]);
 
     this.context.fillText(text, callback.x, callback.y);
+};
+
+Terragen.prototype.drawLine = function(startX, startY, endX, endY, lineWidth, strokeStyle, lineJoin, lineCap) {
+    this.context.lineWidth = lineWidth || 10;
+    this.context.lineCap = lineCap || "round";
+    this.context.lineJoin = lineJOin || "round";
+    this.context.strokeStyle = strokeStyle || "green";
+
+    this.context.beginPath();
+    this.context.moveTo(startX, startY);
+    this.context.lineTo(endX, endY);
+    this.context.stroke();
 };
 
 function addEvent(target, event, fnc) {
@@ -139,14 +163,47 @@ addEvent(window, 'load', function () {
         return new Cell();
     };
 
+    var cameraX = 0, cameraY = 0;
+    var columnsPerScreen = parseInt(300 / 8),
+        rowsPerScreen = parseInt(300 / 8);
+
+
+    var startCellX = cameraX === 0 ? 0 : 8 / cameraX,
+        startCellY = cameraY === 0 ? 0 : 8 / cameraY;
+
+    window.addEventListener('keydown', function(e) {
+        if(e.keyCode === 87) {
+            cameraY -= 10;
+            console.log('moving up');
+        }
+
+        if(e.keyCode === 83) {
+            cameraY += 10;
+            console.log('moving down');
+        }
+
+        if(e.keyCode === 65) {
+            cameraX -= 10;
+        }
+
+        if(e.keyCode === 68) {
+            cameraX += 10;
+        }
+
+        startCellX = parseInt(cameraX / 8),
+        startCellY = parseInt(cameraY / 8);
+
+        console.log(startCellX + ',' + startCellY + ',' + (startCellX + columnsPerScreen) + ',' + (startCellY + rowsPerScreen));
+    });
+
     grid.init(cellGenerator, function() {
         app.start(
             function () {
-                app.active = false;
+               // app.active = false;
             },
 
             function() {
-                grid.map(function(cell) {
+                grid.mapRegion(startCellX, startCellY, startCellX + columnsPerScreen, startCellY + rowsPerScreen, function(cell) {
                     var x = cell.column * cell.width;
                     var y = cell.row * cell.height;
 
@@ -155,13 +212,12 @@ addEvent(window, 'load', function () {
 
                     var text = grid._toIndex(cell.column, cell.row);
                     
-                    this.drawText(0, '6pt Arial', 'blue', function(width) {
+                    this.drawText(app.range(0, 1), '6pt Arial', 'blue', function(width) {
                         this.x = centerX - width * 0.5;
                         this.y = centerY - 3;
                     });
-
-                    console.log('drawing cell ' + cell);
                 }.bind(app));
+
             }
         );
     });
