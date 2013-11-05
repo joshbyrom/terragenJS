@@ -5,6 +5,10 @@ var Terragen = function () {
     this.active = true;
 };
 
+Number.prototype.mod = function(number) {
+    return ((this%number)+number)%number;
+};
+
 Terragen.prototype.createGrid = function(width, height) {
     if(!this.hasOwnProperty('Grid')) {
         this.Grid = function() {
@@ -24,8 +28,8 @@ Terragen.prototype.createGrid = function(width, height) {
         };
 
         this.Grid.prototype._guardedIndex = function(column, row) {
-            var realColumn = column % this.width;
-            var realRow = row % this.height;
+            var realColumn = column.mod(this.width);
+            var realRow = row.mod(this.height);
 
             if(realColumn < 0) {
                 realColumn += this.width;
@@ -56,9 +60,9 @@ Terragen.prototype.createGrid = function(width, height) {
         };
 
         this.Grid.prototype.mapRegion = function(startX, startY, endX, endY, callback) {
-            for(var i = startX; i < endX; ++i) {
-                for(var j = startY; j < endY; ++j) {
-                    callback(this.get(i, j));
+            for(var i = startX, localColumn = 0; i < endX; ++i, ++localColumn, localRow=0) {
+                for(var j = startY, localRow = 0; j < endY; ++j, ++localRow) {
+                    callback(this.get(i, j), localColumn, localRow);
                 }
             }
         };
@@ -127,6 +131,8 @@ Terragen.prototype.drawLine = function(startX, startY, endX, endY, lineWidth, st
     this.context.stroke();
 };
 
+// app specific stuff
+
 function addEvent(target, event, fnc) {
     var onEvent = 'on' + event;
 
@@ -150,71 +156,81 @@ function addEvent(target, event, fnc) {
 addEvent(window, 'load', function () {
     var app = new Terragen();
 
+    var cellWidth = 32, cellHeight = 32;
+
     var grid = app.createGrid(100, 100);
     var cellGenerator = function(grid, column, row) {
         var Cell = function() {
             this.column = column;
             this.row = row;
 
-            this.width = 8;
-            this.height = 8;
+            this.width = cellWidth;
+            this.height = cellHeight;
         };
 
         return new Cell();
     };
 
     var cameraX = 0, cameraY = 0;
-    var columnsPerScreen = parseInt(300 / 8),
-        rowsPerScreen = parseInt(300 / 8);
+    var columnsPerScreen = parseInt((app.canvas.width + (cellWidth * 2.0)) / cellWidth),
+        rowsPerScreen = parseInt((app.canvas.height + (cellHeight * 2.0))/ cellHeight);
 
+    var startCellX = cameraX === 0 ? 0 : cellWidth / cameraX,
+        startCellY = cameraY === 0 ? 0 : cellHeight / cameraY,
+        offsetX = 0, offsetY = 0, cameraSpeed = 3;
 
-    var startCellX = cameraX === 0 ? 0 : 8 / cameraX,
-        startCellY = cameraY === 0 ? 0 : 8 / cameraY;
+    var keys = [];
+
+    var moveCamera = function(x, y) {
+        cameraX += x || 0;
+        cameraY += y || 0;
+
+        startCellX = parseInt(cameraX / cellWidth),
+        startCellY = parseInt(cameraY / cellHeight);
+
+        offsetX = cameraX - (startCellX * cellWidth);
+        offsetY = cameraY - (startCellY * cellHeight);
+    };
 
     window.addEventListener('keydown', function(e) {
-        if(e.keyCode === 87) {
-            cameraY -= 10;
-            console.log('moving up');
-        }
+        keys[e.keyCode] = true;
+    });
 
-        if(e.keyCode === 83) {
-            cameraY += 10;
-            console.log('moving down');
-        }
-
-        if(e.keyCode === 65) {
-            cameraX -= 10;
-        }
-
-        if(e.keyCode === 68) {
-            cameraX += 10;
-        }
-
-        startCellX = parseInt(cameraX / 8),
-        startCellY = parseInt(cameraY / 8);
-
-        console.log(startCellX + ',' + startCellY + ',' + (startCellX + columnsPerScreen) + ',' + (startCellY + rowsPerScreen));
+    window.addEventListener('keyup', function(e) {
+        keys[e.keyCode] = false;
     });
 
     grid.init(cellGenerator, function() {
         app.start(
             function () {
-               // app.active = false;
+                if(keys[87]) {
+                    moveCamera(0,-cameraSpeed);
+                }
+
+                if(keys[83]) {
+                    moveCamera(0,cameraSpeed);
+                }
+
+                if(keys[65]) {
+                    moveCamera(-cameraSpeed);
+                }
+
+                if(keys[68]) {
+                    moveCamera(cameraSpeed);
+                }
             },
 
             function() {
-                grid.mapRegion(startCellX, startCellY, startCellX + columnsPerScreen, startCellY + rowsPerScreen, function(cell) {
-                    var x = cell.column * cell.width;
-                    var y = cell.row * cell.height;
+                grid.mapRegion(startCellX-1, startCellY-1, startCellX + columnsPerScreen, startCellY + rowsPerScreen, function(cell, localColumn, localRow) {
+                    var x = localColumn * cell.width - offsetX - cell.width;
+                    var y = localRow  * cell.height - offsetY - cell.height;
 
                     var centerX = x + (cell.width * 0.5);
-                    var centerY = y + 3;
-
-                    var text = grid._toIndex(cell.column, cell.row);
+                    var centerY = y + (cell.height * 0.5);
                     
-                    this.drawText(app.range(0, 1), '6pt Arial', 'blue', function(width) {
-                        this.x = centerX - width * 0.5;
-                        this.y = centerY - 3;
+                    this.drawText(cell.column + ', ' + cell.row, '6pt Arial', 'blue', function(width) {
+                        this.x = (centerX - (width * 0.5));
+                        this.y = (centerY - 3);
                     });
                 }.bind(app));
 
