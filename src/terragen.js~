@@ -119,7 +119,7 @@ Terragen.prototype.drawText = function(text, font, fillStyle, callback) {
     this.context.fillText(text, callback.x, callback.y);
 };
 
-Terragen.prototype.drawLine = function(startX, startY, endX, endY, strokeStyle, lineWidth, lineJoin, lineCap) {
+Terragen.prototype.drawLine = function(startX, startY, endX, endY, lineWidth, strokeStyle, lineJoin, lineCap) {
     this.context.lineWidth = lineWidth || 10;
     this.context.lineCap = lineCap || "round";
     this.context.lineJoin = lineJOin || "round";
@@ -129,10 +129,6 @@ Terragen.prototype.drawLine = function(startX, startY, endX, endY, strokeStyle, 
     this.context.moveTo(startX, startY);
     this.context.lineTo(endX, endY);
     this.context.stroke();
-};
-
-Terragen.prototype.drawPolygon = function(x, y, points, strokeStyle, fillStyle, lineWidth, lineJoin, lineCap) {
-	
 };
 
 // app specific stuff
