@@ -120,7 +120,7 @@ Terragen.prototype.drawText = function(text, font, fillStyle, callback) {
 };
 
 Terragen.prototype.drawLine = function(startX, startY, endX, endY, strokeStyle, lineWidth, lineJoin, lineCap) {
-    this.context.lineWidth = lineWidth || 10;
+    this.context.lineWidth = lineWidth || 1;
     this.context.lineCap = lineCap || "round";
     this.context.lineJoin = lineJOin || "round";
     this.context.strokeStyle = strokeStyle || "green";
@@ -134,7 +134,7 @@ Terragen.prototype.drawLine = function(startX, startY, endX, endY, strokeStyle, 
 
 // parameters 'points' is an array of two tuple values
 Terragen.prototype.drawPolygon = function(x, y, points, strokeStyle, fillStyle, lineWidth, lineJoin, lineCap) {
-    this.context.lineWidth = lineWidth || 10;
+    this.context.lineWidth = lineWidth || 1;
     this.context.lineCap = lineCap || "round";
     this.context.lineJoin = lineJoin || "round";
     this.context.strokeStyle = strokeStyle || "green";
@@ -185,6 +185,8 @@ addEvent(window, 'load', function () {
 
             this.width = cellWidth;
             this.height = cellHeight;
+
+            this.mouseOver = false;
         };
 
         return new Cell();
@@ -194,8 +196,8 @@ addEvent(window, 'load', function () {
     var columnsPerScreen = parseInt((app.canvas.width + (cellWidth * 2.0)) / cellWidth),
         rowsPerScreen = parseInt((app.canvas.height + (cellHeight * 2.0))/ cellHeight);
 
-    var startCellX = cameraX === 0 ? 0 : cellWidth / cameraX,
-        startCellY = cameraY === 0 ? 0 : cellHeight / cameraY,
+    var startCellX = cameraX / cellWidth,
+        startCellY = cameraY / cellHeight,
         offsetX = 0, offsetY = 0, cameraSpeed = 3;
 
     var keys = [];
@@ -209,7 +211,43 @@ addEvent(window, 'load', function () {
 
         offsetX = cameraX - (startCellX * cellWidth);
         offsetY = cameraY - (startCellY * cellHeight);
+
+        onMouseMoved();
     };
+
+    var lastMouseX = 0, lastMouseY = 0;
+    var lastCellMouseOver = undefined;
+    var onMouseMoved = function(e) {
+		var scaleModX = app.canvas.width / app.canvas.offsetWidth;
+		var scaleModY = app.canvas.height / app.canvas.offsetHeight;
+
+    	var mouseX = cameraX + (e ? e.clientX : lastMouseX) * scaleModX, 
+    	    mouseY = cameraY + (e ? e.clientY : lastMouseY) * scaleModY;
+
+    	var cellX = parseInt(mouseX / cellWidth), 
+    	    cellY = parseInt(mouseY / cellHeight);
+
+    	console.log(cellX, mouseX);
+
+    	var cell = grid.get(mouseX < 0 ? --cellX : cellX, mouseY < 0 ? --cellY : cellY);
+    	if(!cell.mouseOver) {
+    		// cell.onMouseEntered();
+    		cell.mouseOver = true;
+    	} 
+
+    	if(lastCellMouseOver !== undefined && cell !== lastCellMouseOver) {
+    		lastCellMouseOver.mouseOver = false;
+    		//lastCellMouseOver.onMouseExited();
+    	}
+
+    	lastCellMouseOver = cell;
+    	if(e) {
+    		lastMouseY = e.clientY;
+    		lastMouseX = e.clientX;
+    	}
+    };
+
+    window.addEventListener('mousemove', onMouseMoved);
 
     window.addEventListener('keydown', function(e) {
         keys[e.keyCode] = true;
@@ -247,13 +285,12 @@ addEvent(window, 'load', function () {
                     var centerX = x + (cell.width * 0.5);
                     var centerY = y + (cell.height * 0.5);
                     
+                    this.drawPolygon(x, y, [[0,0], [cell.width, 0], [cell.width, cell.height], [0, cell.height]], undefined, cell.mouseOver ? 'blue' : undefined);
                     this.drawText(cell.column + ', ' + cell.row, '6pt Arial', 'blue', function(width) {
                         this.x = (centerX - (width * 0.5));
                         this.y = (centerY - 3);
                     });
                 }.bind(app));
-
-                this.drawPolygon(100, 100, [[10, 40],[30, 100],[10, 150]], undefined, undefined, 2);
             }
         );
     });
