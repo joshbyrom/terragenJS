@@ -128,9 +128,11 @@ Terragen.prototype.drawLine = function(startX, startY, endX, endY, strokeStyle, 
     this.context.beginPath();
     this.context.moveTo(startX, startY);
     this.context.lineTo(endX, endY);
+    this.context.closePath();
     this.context.stroke();
 };
 
+// parameters 'points' is an array of two tuple values
 Terragen.prototype.drawPolygon = function(x, y, points, strokeStyle, fillStyle, lineWidth, lineJoin, lineCap) {
     this.context.lineWidth = lineWidth || 10;
     this.context.lineCap = lineCap || "round";
@@ -138,7 +140,14 @@ Terragen.prototype.drawPolygon = function(x, y, points, strokeStyle, fillStyle, 
     this.context.strokeStyle = strokeStyle || "green";
     this.context.fillStyle = fillStyle || "#f00";
     
-    
+    this.context.beginPath();
+    this.context.moveTo(x + points[points.length-1][0], y + points[points.length-1][1]);
+    for (var i = points.length - 2; i >= 0; i--) {
+    	this.context.lineTo(x + points[i][0], y + points[i][1]);
+    };
+    this.context.closePath();
+    this.context.stroke();
+    this.context.fill()
 };
 
 // app specific stuff
