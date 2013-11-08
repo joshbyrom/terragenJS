@@ -132,7 +132,13 @@ Terragen.prototype.drawLine = function(startX, startY, endX, endY, strokeStyle, 
 };
 
 Terragen.prototype.drawPolygon = function(x, y, points, strokeStyle, fillStyle, lineWidth, lineJoin, lineCap) {
-	
+    this.context.lineWidth = lineWidth || 10;
+    this.context.lineCap = lineCap || "round";
+    this.context.lineJoin = lineJOin || "round";
+    this.context.strokeStyle = strokeStyle || "green";
+    this.context.fillStyle = fillStyle || "#f00";
+    
+    
 };
 
 // app specific stuff
