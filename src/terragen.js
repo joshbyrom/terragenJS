@@ -136,7 +136,7 @@ Terragen.prototype.drawLine = function(startX, startY, endX, endY, strokeStyle, 
 Terragen.prototype.drawPolygon = function(x, y, points, strokeStyle, fillStyle, lineWidth, lineJoin, lineCap) {
     this.context.lineWidth = lineWidth || 10;
     this.context.lineCap = lineCap || "round";
-    this.context.lineJoin = lineJOin || "round";
+    this.context.lineJoin = lineJoin || "round";
     this.context.strokeStyle = strokeStyle || "green";
     this.context.fillStyle = fillStyle || "#f00";
     
@@ -253,6 +253,7 @@ addEvent(window, 'load', function () {
                     });
                 }.bind(app));
 
+                this.drawPolygon(100, 100, [[10, 40],[30, 100],[10, 150]], undefined, undefined, 2);
             }
         );
     });
