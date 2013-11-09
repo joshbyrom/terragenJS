@@ -93,11 +93,9 @@ Terragen.prototype.start = function(update, render, callback) {
             requestAnimationFrame(loop);
         } else if(callback !== undefined) {
             this.callback.apply(this);
-            console.log('simulation ended');
         }
     }.bind(this);
 
-    console.log('simulation started');
     requestAnimationFrame(loop.bind(this));
 }
 
@@ -170,7 +168,7 @@ function addEvent(target, event, fnc) {
             target.onEvent = fnc;
         }
     }
-}
+};
 
 addEvent(window, 'load', function () {
     var app = new Terragen();
@@ -187,6 +185,18 @@ addEvent(window, 'load', function () {
             this.height = cellHeight;
 
             this.mouseOver = false;
+        };
+
+        Cell.prototype.onMouseEnter = function(callback) {
+        	// do something
+
+        	if(callback) callback(this);
+        };
+
+        Cell.prototype.onMouseExit = function(callback) {
+        	// do something
+
+        	if(callback) callback(this);
         };
 
         return new Cell();
@@ -227,17 +237,15 @@ addEvent(window, 'load', function () {
     	var cellX = parseInt(mouseX / cellWidth), 
     	    cellY = parseInt(mouseY / cellHeight);
 
-    	console.log(cellX, mouseX);
-
     	var cell = grid.get(mouseX < 0 ? --cellX : cellX, mouseY < 0 ? --cellY : cellY);
     	if(!cell.mouseOver) {
-    		// cell.onMouseEntered();
+    		cell.onMouseEnter();
     		cell.mouseOver = true;
     	} 
 
     	if(lastCellMouseOver !== undefined && cell !== lastCellMouseOver) {
     		lastCellMouseOver.mouseOver = false;
-    		//lastCellMouseOver.onMouseExited();
+    		lastCellMouseOver.onMouseExit();
     	}
 
     	lastCellMouseOver = cell;
