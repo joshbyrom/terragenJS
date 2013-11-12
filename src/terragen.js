@@ -76,6 +76,217 @@ Terragen.prototype.createGrid = function(width, height) {
     return new this.Grid();
 };
 
+Terragen.prototype.createAgent = function(group) {
+	var Agent = function(group) {
+		this.group = group;
+
+		if(this.group !== undefined) {
+			this.group.size += 1;
+		}
+	}
+
+	Agent.prototype.getAnimation = function() {
+		return this.group.getAnimation();
+	};
+
+	Agent.prototype.getName = function() {
+		return this.group.getName();
+	};
+
+	Agent.prototype.getIsSameGroup = function(other) {
+		return other.getName() === this.getName();
+	};
+
+	Agent.prototype.getAttitudeTowards = function(other) {
+		if(other === null || other === undefined) return 0;
+		else return this.group.getAttitudeTowards(other.group);
+	};
+
+	return new Agent(group);
+};
+
+Terragen.prototype.createGroup = function(name, animation) {
+	var Group = function(name, animation) {
+		this.name = name;
+		this.animation = animation;
+
+		this.size = 0;
+
+		this.selfAttitude = 1;
+		this.baseAttitude = -1;
+
+		this.attitudes = {};
+	};
+
+	Group.prototype.getName = function() {
+		return this.name;
+	};
+
+	Group.prototype.getAnimation = function() {
+		return this.animation;
+	};
+
+	Group.prototype.getAttitudeTowards = function(other) {
+		if(other.getName() === this.getName()) return this.selfAttitude;
+		else {
+			if(this.attitudes.hasOwnProperty(other.getName())) {
+				return this.attitudes[other.getName()](this, other);
+			} else {
+				return this.baseAttitude;
+			}
+		}
+	}
+
+	Group.prototype.setAttitudeTowards = function(other, callback) {
+		this.attitudes[other.getName()] = callback.bind(this);
+	};
+
+	return new Group(name, animation);
+};
+
+Terragen.prototype.createGroupLogic = function(grid, groups) {
+	var self = this;
+
+	var GroupLogic = function(grid, groups) {
+		this.grid = grid;
+		this.groups = groups;
+
+		this.birthChance = 0.55;
+		this.initialRange = 5;
+		this.extendedRange = 10;
+	};
+
+	GroupLogic.prototype.update = function() {
+		this.grid.map(this.handleCell.bind(this));
+		this.grid.map(this.pushNextState);
+	};
+
+	GroupLogic.prototype.pushNextState = function(cell) {
+		cell.state = cell.nextState;
+	};
+
+	GroupLogic.prototype.handleCell = function(cell) {
+		if(!cell.hasOwnProperty('state')) {
+			cell.state = 'unknown';
+		} else {
+			var state = cell.state;
+
+			if(state === 'unknown') {
+				if(self.range(0, 1) < this.birthChance) {
+					cell.agent = this.createAgent();
+					cell.nextState = 'occupied';
+				} else {
+					cell.nextState = 'empty';
+					cell.agent = undefined;
+				}
+			} else if(state === 'occupied') {
+				this.determineMove(cell, this.initialRange);
+			}
+		}
+	};
+
+	GroupLogic.prototype.createAgent = function() {
+		var index = Math.floor(Math.random() * this.groups.length);
+		return self.createAgent(this.groups.index);
+	};
+
+	GroupLogic.prototype.determineMove = function(cell, range) {
+		var halfRange = parseInt(range * 0.5);
+
+		var sx = cell.column-halfRange,
+		    sy = cell.row-halfRange,
+		    ex = cell.column+halfRange,
+		    ey = cell.row+halfRange;
+
+		var groupLogic = this;
+		var currentValue = 0, highestValue = 0, result = cell;
+		this.grid.mapRegion(sx, sy, ex, ey, function(mappedCell, lc, ly) {
+			if(mappedCell.column === cell.column && mappedCell.row === cell.row) return;
+		
+			if(mappedCell.state === 'empty' && mappedCell.nextState !== 'occupied') {
+				currentValue = groupLogic.getCellValue(cell, mappedCell);
+				if(currentValue > highestValue) {
+					highestValue = currentValue;
+					result = mappedCell;
+				}
+			}
+		});
+
+		if(result !== cell) {
+			this.moveCell(cell, result);
+		} else if(range < this.extendedRange) {
+			this.determineMove(cell, range++);
+		}
+	};
+
+	GroupLogic.prototype.getCellValue = function(cell, other, range) {
+		var attitude = 0;
+
+		var halfRange = parseInt((range || this.initialRange) * 0.5);
+
+		var sx = cell.column-halfRange,
+		    sy = cell.row-halfRange,
+		    ex = cell.column+halfRange,
+		    ey = cell.row+halfRange;
+
+		this.grid.mapRegion(sx, sy, ex, ey, function(mappedCell, lc, ly) {
+			if(mappedCell.column === cell.column && mappedCell.row === cell.row) return;
+			
+			attitude += cell.agent.getAttitudeTowards(other.agent);
+		});
+
+		return attitude;
+	};
+
+	GroupLogic.prototype.moveCell = function(cell, target) {
+		var tmp = target.agent;
+
+		target.nextState = cell.state;
+		target.agent = cell.agent;
+
+		cell.nextState = target.state;
+		cell.agent = tmp;
+	};
+
+	return new GroupLogic(grid, groups);
+};
+
+Terragen.prototype.createAnimation = function(uri, frameWidth, frameHeight, callback) {
+	var image = new Image;
+	var self = this;
+
+	image.onload = function() {
+		var animation = function(image, frameWidth, frameHeight) {
+			this.image = image;
+
+			this.frameWidth = frameWidth;
+			this.frameHeight = frameHeight;
+
+			this.framesPerColumn = parseInt(image.width / this.frameWidth);
+			this.framesPerRow = parseInt(image.height / this.frameHeight);
+
+			this.currentFrameX = 0;
+			this.currentFrameY = 0;
+
+			this.scaleX = 1;
+			this.scaleY = 1;
+		};
+
+		animation.prototype.drawCurrentImage = function(x, y) {
+			var sx = parseInt(this.currentFrameX * this.frameWidth),
+			    sy = parseInt(this.currentFrameY * this.frameHeight);
+
+			var dw = parseInt(this.frameWidth * this.scaleX),
+			    dh = parseInt(this.frameHeight * this.scaleY);
+
+			self.context.drawImage(this.image, sx, sy, this.frameWidth, this.frameHeight, x, y, dw, dh);
+		};
+
+		callback(new animation(image, frameWidth, frameHeight));
+	};
+	image.src = uri;
+};
+
 Terragen.prototype.start = function(update, render, callback) {
     this.update = update || function() { this.active = false; };
     this.render = render || function() {};
@@ -148,8 +359,8 @@ Terragen.prototype.drawPolygon = function(x, y, points, strokeStyle, fillStyle, 
     this.context.fill()
 };
 
-// app specific stuff
 
+// app specific stuff
 function addEvent(target, event, fnc) {
     var onEvent = 'on' + event;
 
@@ -208,7 +419,7 @@ addEvent(window, 'load', function () {
 
     var startCellX = cameraX / cellWidth,
         startCellY = cameraY / cellHeight,
-        offsetX = 0, offsetY = 0, cameraSpeed = 3;
+        offsetX = 0, offsetY = 0, cameraSpeed = 11;
 
     var keys = [];
 
@@ -265,9 +476,31 @@ addEvent(window, 'load', function () {
         keys[e.keyCode] = false;
     });
 
+    var testAnimation = undefined;
+
+    app.createAnimation('base.png', 16, 16, function(animation) {
+    	testAnimation = animation;
+    	testAnimation.scaleX = 2;
+    	testAnimation.scaleY = 2;
+
+    	testAnimation.counter = 0;
+    	testAnimation.update = function() {
+    		testAnimation.counter++;
+
+            if(testAnimation.counter > 4) {
+                testAnimation.counter = 0;
+                testAnimation.currentFrameX += 1;
+
+                if(testAnimation.currentFrameX >= testAnimation.framesPerColumn) {
+                	testAnimation.currentFrameX = 0;
+                }
+            }
+    	};
+    })
+
     grid.init(cellGenerator, function() {
         app.start(
-            function () {
+            function update() {
                 if(keys[87]) {
                     moveCamera(0,-cameraSpeed);
                 }
@@ -283,9 +516,13 @@ addEvent(window, 'load', function () {
                 if(keys[68]) {
                     moveCamera(cameraSpeed);
                 }
+
+                if(testAnimation != undefined) {
+                	testAnimation.update();
+                }
             },
 
-            function() {
+            function render() {
                 grid.mapRegion(startCellX-1, startCellY-1, startCellX + columnsPerScreen, startCellY + rowsPerScreen, function(cell, localColumn, localRow) {
                     var x = localColumn * cell.width - offsetX - cell.width;
                     var y = localRow  * cell.height - offsetY - cell.height;
@@ -299,6 +536,8 @@ addEvent(window, 'load', function () {
                         this.y = (centerY - 3);
                     });
                 }.bind(app));
+
+                if(testAnimation != undefined) testAnimation.drawCurrentImage((0-cameraX).mod(grid.width * cellWidth), 0-cameraY);
             }
         );
     });
