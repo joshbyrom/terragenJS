@@ -3,6 +3,8 @@ var Terragen = function () {
     this.context = canvas.getContext('2d');
 
     this.active = true;
+
+    this._objects = [];
 };
 
 Number.prototype.mod = function(number) {
@@ -86,11 +88,11 @@ Terragen.prototype.createAgent = function(group) {
 	}
 
 	Agent.prototype.getAnimation = function() {
-		return this.group.getAnimation();
+		return this.group.animation;
 	};
 
 	Agent.prototype.getName = function() {
-		return this.group.getName();
+		return this.group.name;
 	};
 
 	Agent.prototype.getIsSameGroup = function(other) {
@@ -118,19 +120,12 @@ Terragen.prototype.createGroup = function(name, animation) {
 		this.attitudes = {};
 	};
 
-	Group.prototype.getName = function() {
-		return this.name;
-	};
-
-	Group.prototype.getAnimation = function() {
-		return this.animation;
-	};
-
 	Group.prototype.getAttitudeTowards = function(other) {
-		if(other.getName() === this.getName()) return this.selfAttitude;
-		else {
-			if(this.attitudes.hasOwnProperty(other.getName())) {
-				return this.attitudes[other.getName()](this, other);
+		if(other.name === this.name) {
+			return this.selfAttitude;
+		} else {
+			if(this.attitudes.hasOwnProperty(other.name)) {
+				return this.attitudes[other.name](this, other);
 			} else {
 				return this.baseAttitude;
 			}
@@ -138,7 +133,7 @@ Terragen.prototype.createGroup = function(name, animation) {
 	}
 
 	Group.prototype.setAttitudeTowards = function(other, callback) {
-		this.attitudes[other.getName()] = callback.bind(this);
+		this.attitudes[other.name] = callback.bind(this);
 	};
 
 	return new Group(name, animation);
@@ -152,8 +147,8 @@ Terragen.prototype.createGroupLogic = function(grid, groups) {
 		this.groups = groups;
 
 		this.birthChance = 0.55;
-		this.initialRange = 5;
-		this.extendedRange = 10;
+		this.initialRange = 2;
+		this.extendedRange = 4;
 	};
 
 	GroupLogic.prototype.update = function() {
@@ -166,28 +161,23 @@ Terragen.prototype.createGroupLogic = function(grid, groups) {
 	};
 
 	GroupLogic.prototype.handleCell = function(cell) {
-		if(!cell.hasOwnProperty('state')) {
-			cell.state = 'unknown';
-		} else {
-			var state = cell.state;
-
-			if(state === 'unknown') {
-				if(self.range(0, 1) < this.birthChance) {
-					cell.agent = this.createAgent();
-					cell.nextState = 'occupied';
-				} else {
-					cell.nextState = 'empty';
-					cell.agent = undefined;
-				}
-			} else if(state === 'occupied') {
-				this.determineMove(cell, this.initialRange);
+		var state = cell.state || 'unknown';
+		if(state === 'unknown') {
+			if(self.range(0, 1) < this.birthChance) {
+				cell.agent = this.createAgent();
+				cell.nextState = 'occupied';
+			} else {
+				cell.nextState = 'empty';
+				cell.agent = undefined;
 			}
+		} else if(state === 'occupied') {
+			this.determineMove(cell, this.initialRange);
 		}
 	};
 
 	GroupLogic.prototype.createAgent = function() {
 		var index = Math.floor(Math.random() * this.groups.length);
-		return self.createAgent(this.groups.index);
+		return self.createAgent(this.groups[index]);
 	};
 
 	GroupLogic.prototype.determineMove = function(cell, range) {
@@ -198,13 +188,14 @@ Terragen.prototype.createGroupLogic = function(grid, groups) {
 		    ex = cell.column+halfRange,
 		    ey = cell.row+halfRange;
 
-		var groupLogic = this;
-		var currentValue = 0, highestValue = 0, result = cell;
+		var self = this;
+		var currentValue = 0, highestValue = this.getCellValue(cell, cell, range), result = cell;
 		this.grid.mapRegion(sx, sy, ex, ey, function(mappedCell, lc, ly) {
 			if(mappedCell.column === cell.column && mappedCell.row === cell.row) return;
 		
 			if(mappedCell.state === 'empty' && mappedCell.nextState !== 'occupied') {
-				currentValue = groupLogic.getCellValue(cell, mappedCell);
+				currentValue = self.getCellValue(cell, mappedCell, range);
+
 				if(currentValue > highestValue) {
 					highestValue = currentValue;
 					result = mappedCell;
@@ -215,7 +206,7 @@ Terragen.prototype.createGroupLogic = function(grid, groups) {
 		if(result !== cell) {
 			this.moveCell(cell, result);
 		} else if(range < this.extendedRange) {
-			this.determineMove(cell, range++);
+			this.determineMove(cell, ++range);
 		}
 	};
 
@@ -224,15 +215,15 @@ Terragen.prototype.createGroupLogic = function(grid, groups) {
 
 		var halfRange = parseInt((range || this.initialRange) * 0.5);
 
-		var sx = cell.column-halfRange,
-		    sy = cell.row-halfRange,
-		    ex = cell.column+halfRange,
-		    ey = cell.row+halfRange;
+		var sx = other.column-halfRange,
+		    sy = other.row-halfRange,
+		    ex = other.column+halfRange,
+		    ey = other.row+halfRange;
 
 		this.grid.mapRegion(sx, sy, ex, ey, function(mappedCell, lc, ly) {
 			if(mappedCell.column === cell.column && mappedCell.row === cell.row) return;
-			
-			attitude += cell.agent.getAttitudeTowards(other.agent);
+
+			attitude += cell.agent.getAttitudeTowards(mappedCell.agent);
 		});
 
 		return attitude;
@@ -287,6 +278,37 @@ Terragen.prototype.createAnimation = function(uri, frameWidth, frameHeight, call
 	image.src = uri;
 };
 
+Terragen.prototype.createAnimationDriver = function(animation, duration) {
+	var AnimationDriver = function(animation, duration) {
+		this.animation = animation;
+
+    	this.scaleX = 2;
+    	this.scaleY = 2;
+
+    	this.counter = 0;
+    	this.duration = duration || 4;
+
+    	animation.driver = this;
+    };
+
+    AnimationDriver.prototype.update = function() {
+    	this.counter++;
+
+        if(this.counter > this.duration) {
+            this.counter = 0;
+            this.animation.currentFrameX += 1;
+
+            if(this.animation.currentFrameX >= this.animation.framesPerColumn) {
+               	this.animation.currentFrameX = 0;
+            }
+        }
+   	};
+
+	var result = new AnimationDriver(animation, duration);
+	this._objects.push(result);
+	return result;
+};
+
 Terragen.prototype.start = function(update, render, callback) {
     this.update = update || function() { this.active = false; };
     this.render = render || function() {};
@@ -298,6 +320,20 @@ Terragen.prototype.start = function(update, render, callback) {
         this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);   
 
         this.render();
+
+        var obj = undefined;
+        for (var i = this._objects.length - 1; i >= 0; i--) {
+        	obj = this._objects[i];
+
+        	if(obj.update) {
+        		obj.update();
+        	}
+
+        	if(obj.render) {
+        		obj.render();
+        	}
+        };
+
         this.update();
 
         if(this.active) {
@@ -384,6 +420,24 @@ function addEvent(target, event, fnc) {
 addEvent(window, 'load', function () {
     var app = new Terragen();
 
+    var groups = [];
+    var grassGroup = app.createGroup('grass', undefined);
+    var dirtGroup = app.createGroup('dirt', undefined);
+    groups.push(grassGroup);
+    groups.push(dirtGroup);
+
+    app.createAnimation('grass.png', 32, 32, function(animation) {
+    	app.createAnimationDriver(animation);
+    	
+    	grassGroup.animation = animation;
+    });
+
+    app.createAnimation('dirt.png', 32, 32, function(animation) {
+    	app.createAnimationDriver(animation);
+    	
+    	dirtGroup.animation = animation;
+    });
+
     var cellWidth = 32, cellHeight = 32;
 
     var grid = app.createGrid(100, 100);
@@ -410,8 +464,20 @@ addEvent(window, 'load', function () {
         	if(callback) callback(this);
         };
 
+        Cell.prototype.render = function(x, y) {
+        	if(this.agent) {
+        		if(this.agent.getAnimation()) {
+        			this.agent.getAnimation().drawCurrentImage(x, y);
+        		} else {
+		            app.drawPolygon(x, y, [[0,0], [this.width, 0], [this.width, this.height], [0, this.height]], undefined, this.mouseOver ? 'blue' : undefined);
+            	}
+        	}
+        };
+
         return new Cell();
     };
+
+    var groupLogic = app.createGroupLogic(grid, groups);
 
     var cameraX = 0, cameraY = 0;
     var columnsPerScreen = parseInt((app.canvas.width + (cellWidth * 2.0)) / cellWidth),
@@ -476,28 +542,33 @@ addEvent(window, 'load', function () {
         keys[e.keyCode] = false;
     });
 
-    var testAnimation = undefined;
-
     app.createAnimation('base.png', 16, 16, function(animation) {
-    	testAnimation = animation;
-    	testAnimation.scaleX = 2;
-    	testAnimation.scaleY = 2;
+    	app.createAnimationDriver(animation).render = function render () {
+    		animation.drawCurrentImage((0-cameraX).mod(grid.width * cellWidth), (0-cameraY).mod(grid.height * cellHeight));
+    	}
+    });
 
-    	testAnimation.counter = 0;
-    	testAnimation.update = function() {
-    		testAnimation.counter++;
+    var render = function render() {
+        grid.mapRegion(startCellX-1, startCellY-1, startCellX + columnsPerScreen, startCellY + rowsPerScreen, function(cell, localColumn, localRow) {
+            var x = localColumn * cell.width - offsetX - cell.width;
+            var y = localRow  * cell.height - offsetY - cell.height;
 
-            if(testAnimation.counter > 4) {
-                testAnimation.counter = 0;
-                testAnimation.currentFrameX += 1;
-
-                if(testAnimation.currentFrameX >= testAnimation.framesPerColumn) {
-                	testAnimation.currentFrameX = 0;
-                }
+            var centerX = x + (cell.width * 0.5);
+            var centerY = y + (cell.height * 0.5);
+                    
+            if(cell.render) cell.render(x, y);
+            else {
+	            app.drawPolygon(x, y, [[0,0], [cell.width, 0], [cell.width, cell.height], [0, cell.height]], undefined, cell.mouseOver ? 'blue' : undefined);
+	            app.drawText(cell.column + ', ' + cell.row, '6pt Arial', 'blue', function(width) {
+	                this.x = (centerX - (width * 0.5));
+	                this.y = (centerY - 3);
+	            });
             }
-    	};
-    })
+        }.bind(app));
+    };
 
+    var logicTimer = 0;
+    var logicLimit = 5;
     grid.init(cellGenerator, function() {
         app.start(
             function update() {
@@ -517,28 +588,18 @@ addEvent(window, 'load', function () {
                     moveCamera(cameraSpeed);
                 }
 
-                if(testAnimation != undefined) {
-                	testAnimation.update();
+                logicTimer += 1;
+                if(logicTimer > 100 && logicLimit-- > 0) {
+                	groupLogic.update();
+                	groupLogic.update();
+                	groupLogic.update();
+                	groupLogic.update();
+                	groupLogic.update();
+                	groupLogic.update();
+                	groupLogic.update();
+
+                	logicTimer = 0;
                 }
-            },
-
-            function render() {
-                grid.mapRegion(startCellX-1, startCellY-1, startCellX + columnsPerScreen, startCellY + rowsPerScreen, function(cell, localColumn, localRow) {
-                    var x = localColumn * cell.width - offsetX - cell.width;
-                    var y = localRow  * cell.height - offsetY - cell.height;
-
-                    var centerX = x + (cell.width * 0.5);
-                    var centerY = y + (cell.height * 0.5);
-                    
-                    this.drawPolygon(x, y, [[0,0], [cell.width, 0], [cell.width, cell.height], [0, cell.height]], undefined, cell.mouseOver ? 'blue' : undefined);
-                    this.drawText(cell.column + ', ' + cell.row, '6pt Arial', 'blue', function(width) {
-                        this.x = (centerX - (width * 0.5));
-                        this.y = (centerY - 3);
-                    });
-                }.bind(app));
-
-                if(testAnimation != undefined) testAnimation.drawCurrentImage((0-cameraX).mod(grid.width * cellWidth), 0-cameraY);
-            }
-        );
+            }, render);
     });
 });
