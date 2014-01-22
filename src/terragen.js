@@ -591,12 +591,6 @@ addEvent(window, 'load', function () {
                 logicTimer += 1;
                 if(logicTimer > 100 && logicLimit-- > 0) {
                 	groupLogic.update();
-                	groupLogic.update();
-                	groupLogic.update();
-                	groupLogic.update();
-                	groupLogic.update();
-                	groupLogic.update();
-                	groupLogic.update();
 
                 	logicTimer = 0;
                 }
